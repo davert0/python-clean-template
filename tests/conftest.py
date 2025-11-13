@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from src.infrastructure.database.connection import db_connection
 from src.presentation.api.routes.users import router as users_router
+from src.presentation.api.routes.comments import router as comments_router
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -15,10 +16,13 @@ async def client():
     
     app = FastAPI(title="Test App")
     app.include_router(users_router)
+    app.include_router(comments_router)
     
     pool = db_connection.pool
     async with pool.acquire() as conn:
         await conn.execute("truncate table users cascade;")
+        await conn.execute("truncate table comments cascade;")
+        await conn.execute("truncate table logs cascade;")
     
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -28,4 +32,6 @@ async def client():
     
     async with pool.acquire() as conn:
         await conn.execute("truncate table users cascade;")
+        await conn.execute("truncate table comments cascade;")
+        await conn.execute("truncate table logs cascade;")
 
