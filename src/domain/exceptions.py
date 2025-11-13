@@ -13,3 +13,7 @@ class EntityAlreadyExists(DomainException):
 class ValidationError(DomainException):
     pass
 
+
+class CommentNotFound(DomainException):
+    pass
+

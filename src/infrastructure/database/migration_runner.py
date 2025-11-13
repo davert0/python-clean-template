@@ -2,10 +2,14 @@ import asyncio
 import asyncpg
 from pathlib import Path
 from src.infrastructure.config import settings
+import platform
 
 
 class MigrationRunner:
-    def __init__(self, migrations_dir: str = "src/infrastructure/database/migrations"):
+    def __init__(self, migrations_dir: str = None):
+        base_dir = Path(__file__).resolve().parent
+        if migrations_dir is None:
+            migrations_dir = base_dir / "migrations"
         self.migrations_dir = Path(migrations_dir)
         self.migrations_dir.mkdir(parents=True, exist_ok=True)
     
@@ -23,12 +27,15 @@ class MigrationRunner:
     
     async def _get_pending_migrations(self, conn):
         applied = await self._get_applied_migrations(conn)
-        all_migrations = sorted([
-            f.stem for f in self.migrations_dir.glob("*.sql")
-        ])
+        all_migrations = sorted([f.stem for f in self.migrations_dir.glob("*.sql")])
+        print(f"🔍 Found migrations: {all_migrations}")
         return [m for m in all_migrations if m not in applied]
     
     async def migrate(self):
+        print(
+            f"🔌 Connecting to {settings.database_name}@"
+            f"{settings.database_host}:{settings.database_port}"
+            f" as {settings.database_user}")
         conn = await asyncpg.connect(
             host=settings.database_host,
             port=settings.database_port,
@@ -36,7 +43,8 @@ class MigrationRunner:
             user=settings.database_user,
             password=settings.database_password,
         )
-        
+        db_name = await conn.fetchval("SELECT current_database()")
+        print(f"📡 Connected to database: {db_name}")
         try:
             await self._ensure_migrations_table(conn)
             pending = await self._get_pending_migrations(conn)
@@ -76,7 +84,10 @@ class MigrationRunner:
             user=settings.database_user,
             password=settings.database_password,
         )
-        
+
+        db_name = await conn.fetchval("SELECT current_database()")
+        print(f"📡 Connected to database: {db_name}")
+
         try:
             await self._ensure_migrations_table(conn)
             applied = await self._get_applied_migrations(conn)
@@ -112,6 +123,8 @@ async def main():
     else:
         await runner.migrate()
 
+if platform.system() == "Windows":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 if __name__ == "__main__":
     asyncio.run(main())
